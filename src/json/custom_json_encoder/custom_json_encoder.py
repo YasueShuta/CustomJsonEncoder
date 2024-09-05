@@ -1,78 +1,19 @@
 """Implementation of JSONEncoder
 source: https://github.com/python/cpython/blob/main/Lib/json/encoder.py
 """
-import re
+from sys import stderr
+from . import CustomSerializable, CustomSerializeError
 
-try:
-    from _json import encode_basestring_ascii as c_encode_basestring_ascii
-except ImportError:
-    c_encode_basestring_ascii = None
-try:
-    from _json import encode_basestring as c_encode_basestring
-except ImportError:
-    c_encode_basestring = None
-try:
-    from _json import make_encoder as c_make_encoder
-except ImportError:
-    c_make_encoder = None
+from json.encoder import (
+    c_make_encoder,
+    INFINITY,
+    encode_basestring,
+    encode_basestring_ascii,
+    JSONEncoder
+)
+CUSTOM_CLASSES = []
 
-ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
-ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
-HAS_UTF8 = re.compile(b'[\x80-\xff]')
-ESCAPE_DCT = {
-    '\\': '\\\\',
-    '"': '\\"',
-    '\b': '\\b',
-    '\f': '\\f',
-    '\n': '\\n',
-    '\r': '\\r',
-    '\t': '\\t',
-}
-for i in range(0x20):
-    ESCAPE_DCT.setdefault(chr(i), '\\u{0:04x}'.format(i))
-    #ESCAPE_DCT.setdefault(chr(i), '\\u%04x' % (i,))
-del i
-
-INFINITY = float('inf')
-
-def py_encode_basestring(s):
-    """Return a JSON representation of a Python string
-
-    """
-    def replace(match):
-        return ESCAPE_DCT[match.group(0)]
-    return '"' + ESCAPE.sub(replace, s) + '"'
-
-
-encode_basestring = (c_encode_basestring or py_encode_basestring)
-
-
-def py_encode_basestring_ascii(s):
-    """Return an ASCII-only JSON representation of a Python string
-
-    """
-    def replace(match):
-        s = match.group(0)
-        try:
-            return ESCAPE_DCT[s]
-        except KeyError:
-            n = ord(s)
-            if n < 0x10000:
-                return '\\u{0:04x}'.format(n)
-                #return '\\u%04x' % (n,)
-            else:
-                # surrogate pair
-                n -= 0x10000
-                s1 = 0xd800 | ((n >> 10) & 0x3ff)
-                s2 = 0xdc00 | (n & 0x3ff)
-                return '\\u{0:04x}\\u{1:04x}'.format(s1, s2)
-    return '"' + ESCAPE_ASCII.sub(replace, s) + '"'
-
-
-encode_basestring_ascii = (
-    c_encode_basestring_ascii or py_encode_basestring_ascii)
-
-class JSONEncoder(object):
+class CustomJSONEncoder(JSONEncoder):
     """Extensible JSON <https://json.org> encoder for Python data structures.
 
     Supports the following objects and types by default:
@@ -100,12 +41,11 @@ class JSONEncoder(object):
     object for ``o`` if possible, otherwise it should call the superclass
     implementation (to raise ``TypeError``).
 
+    Add a custom class as custom_classes. Override encode method for serialize.
     """
-    item_separator = ', '
-    key_separator = ': '
     def __init__(self, *, skipkeys=False, ensure_ascii=True,
             check_circular=True, allow_nan=True, sort_keys=False,
-            indent=None, separators=None, default=None):
+            indent=None, separators=None, default=None, custom_classes=[]):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -146,49 +86,22 @@ class JSONEncoder(object):
 
         """
 
-        self.skipkeys = skipkeys
-        self.ensure_ascii = ensure_ascii
-        self.check_circular = check_circular
-        self.allow_nan = allow_nan
-        self.sort_keys = sort_keys
-        self.indent = indent
-        if separators is not None:
-            self.item_separator, self.key_separator = separators
-        elif indent is not None:
-            self.item_separator = ','
-        if default is not None:
-            self.default = default
+        super().__init__(skipkeys, ensure_ascii, check_circular, allow_nan, sort_keys, indent, separators, default)
+        self.add_custom_classes(custom_classes)
 
-    def default(self, o):
-        """Implement this method in a subclass such that it returns
-        a serializable object for ``o``, or calls the base implementation
-        (to raise a ``TypeError``).
+    def add_custom_classes(self, classes):
+        for t in classes:
+            if isinstance(t, CustomSerializable):
+                CUSTOM_CLASSES.append(t)
+            else:
+                print(f'{t.__name__} is not CustomSerializable.', file=stderr)
 
-        For example, to support arbitrary iterators, you could
-        implement default like this::
-
-            def default(self, o):
-                try:
-                    iterable = iter(o)
-                except TypeError:
-                    pass
-                else:
-                    return list(iterable)
-                # Let the base class default method raise the TypeError
-                return super().default(o)
-
-        """
-        raise TypeError(f'Object of type {o.__class__.__name__} '
-                        f'is not JSON serializable')
+    def remove_custom_classes(self, classes):
+        for t in classes:
+            if t in CUSTOM_CLASSES:
+                CUSTOM_CLASSES.remove(t)
 
     def encode(self, o):
-        """Return a JSON string representation of a Python data structure.
-
-        >>> from json.encoder import JSONEncoder
-        >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
-        '{"foo": ["bar", "baz"]}'
-
-        """
         # This is for extremely simple cases and benchmarks.
         if isinstance(o, str):
             if self.ensure_ascii:
@@ -198,7 +111,7 @@ class JSONEncoder(object):
         # This doesn't pass the iterator directly to ''.join() because the
         # exceptions aren't as detailed.  The list call should be roughly
         # equivalent to the PySequence_Fast that ''.join() would do.
-        chunks = self.iterencode(o, _one_shot=True)
+        chunks = self.iterencode(o, _one_shot=(not self.custom_classes))
         if not isinstance(chunks, (list, tuple)):
             chunks = list(chunks)
         return ''.join(chunks)
@@ -276,7 +189,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _intstr=int.__repr__,
     ):
 
-    def _iterencode_list(lst, _current_indent_level):
+    def _iterencode_list(lst, _current_indent_level, _local_separator=_item_separator):
         if not lst:
             yield '[]'
             return
@@ -289,7 +202,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         if _indent is not None:
             _current_indent_level += 1
             newline_indent = '\n' + _indent * _current_indent_level
-            separator = _item_separator + newline_indent
+            separator = _local_separator + newline_indent
             buf += newline_indent
         else:
             newline_indent = None
@@ -298,7 +211,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             if i:
                 buf = separator
             try:
-                if isinstance(value, str):
+                if any([isinstance(value, t) for t in CUSTOM_CLASSES]) and \
+                        value.try_yield(default_iterencode=_iterencode):
+                    yield value.get_yield(default_iterencode=_iterencode)
+                elif isinstance(value, str):
                     yield buf + _encoder(value)
                 elif value is None:
                     yield buf + 'null'
@@ -317,11 +233,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 else:
                     yield buf
                     if isinstance(value, (list, tuple)):
-                        chunks = _iterencode_list(value, _current_indent_level)
+                        chunks = _iterencode_list(value, _current_indent_level, _local_separator)
                     elif isinstance(value, dict):
-                        chunks = _iterencode_dict(value, _current_indent_level)
+                        chunks = _iterencode_dict(value, _current_indent_level, _local_separator)
                     else:
-                        chunks = _iterencode(value, _current_indent_level)
+                        chunks = _iterencode(value, _current_indent_level, _local_separator)
                     yield from chunks
             except GeneratorExit:
                 raise
@@ -335,7 +251,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         if markers is not None:
             del markers[markerid]
 
-    def _iterencode_dict(dct, _current_indent_level):
+    def _iterencode_dict(dct, _current_indent_level, _local_separator=_item_separator):
         if not dct:
             yield '{}'
             return
@@ -348,11 +264,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         if _indent is not None:
             _current_indent_level += 1
             newline_indent = '\n' + _indent * _current_indent_level
-            item_separator = _item_separator + newline_indent
+            item_separator = _local_separator + newline_indent
             yield newline_indent
         else:
             newline_indent = None
-            item_separator = _item_separator
+            item_separator = _local_separator
         first = True
         if _sort_keys:
             items = sorted(dct.items())
@@ -387,6 +303,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             yield _encoder(key)
             yield _key_separator
             try:
+                if any([isinstance(value, t) for t in CUSTOM_CLASSES]) and \
+                        value.try_yield(default_iterencode=_iterencode):
+                    yield value.get_yield(default_iterencode=_iterencode)
                 if isinstance(value, str):
                     yield _encoder(value)
                 elif value is None:
@@ -403,11 +322,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     yield _floatstr(value)
                 else:
                     if isinstance(value, (list, tuple)):
-                        chunks = _iterencode_list(value, _current_indent_level)
+                        chunks = _iterencode_list(value, _current_indent_level, _local_separator)
                     elif isinstance(value, dict):
-                        chunks = _iterencode_dict(value, _current_indent_level)
+                        chunks = _iterencode_dict(value, _current_indent_level, _local_separator)
                     else:
-                        chunks = _iterencode(value, _current_indent_level)
+                        chunks = _iterencode(value, _current_indent_level, _local_separator)
                     yield from chunks
             except GeneratorExit:
                 raise
@@ -421,8 +340,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         if markers is not None:
             del markers[markerid]
 
-    def _iterencode(o, _current_indent_level):
-        if isinstance(o, str):
+    def _iterencode(o, _current_indent_level, _local_separator=_item_separator):
+        if any([isinstance(o, t) for t in CUSTOM_CLASSES]) and \
+                o.try_yield(default_iterencode=_iterencode):
+            yield o.get_yield(default_iterencode=_iterencode)
+        elif isinstance(o, str):
             yield _encoder(o)
         elif o is None:
             yield 'null'
@@ -437,9 +359,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             # see comment for int/float in _make_iterencode
             yield _floatstr(o)
         elif isinstance(o, (list, tuple)):
-            yield from _iterencode_list(o, _current_indent_level)
+            yield from _iterencode_list(o, _current_indent_level, _local_separator)
         elif isinstance(o, dict):
-            yield from _iterencode_dict(o, _current_indent_level)
+            yield from _iterencode_dict(o, _current_indent_level, _local_separator)
         else:
             if markers is not None:
                 markerid = id(o)
@@ -448,7 +370,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 markers[markerid] = o
             newobj = _default(o)
             try:
-                yield from _iterencode(newobj, _current_indent_level)
+                yield from _iterencode(newobj, _current_indent_level, _local_separator)
             except GeneratorExit:
                 raise
             except BaseException as exc:
