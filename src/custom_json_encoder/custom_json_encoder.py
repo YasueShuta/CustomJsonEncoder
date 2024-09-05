@@ -2,7 +2,7 @@
 source: https://github.com/python/cpython/blob/main/Lib/json/encoder.py
 """
 from sys import stderr
-from . import CustomSerializable, CustomSerializeError
+from .custom_serializable import CustomSerializable, CustomSerializeError
 
 from json.encoder import (
     c_make_encoder,
@@ -86,12 +86,20 @@ class CustomJSONEncoder(JSONEncoder):
 
         """
 
-        super().__init__(skipkeys, ensure_ascii, check_circular, allow_nan, sort_keys, indent, separators, default)
+        super().__init__(skipkeys=skipkeys,
+                         ensure_ascii=ensure_ascii,
+                         check_circular=check_circular,
+                         allow_nan=allow_nan,
+                         sort_keys=sort_keys,
+                         indent=indent,
+                         separators=separators,
+                         default=default)
         self.add_custom_classes(custom_classes)
 
     def add_custom_classes(self, classes):
+        self.custom_classes = classes
         for t in classes:
-            if isinstance(t, CustomSerializable):
+            if issubclass(t, CustomSerializable):
                 CUSTOM_CLASSES.append(t)
             else:
                 print(f'{t.__name__} is not CustomSerializable.', file=stderr)
@@ -206,14 +214,13 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             buf += newline_indent
         else:
             newline_indent = None
-            separator = _item_separator
+            separator = _local_separator
         for i, value in enumerate(lst):
             if i:
                 buf = separator
             try:
-                if any([isinstance(value, t) for t in CUSTOM_CLASSES]) and \
-                        value.try_yield(default_iterencode=_iterencode):
-                    yield value.get_yield(default_iterencode=_iterencode)
+                if isinstance(value, tuple(CUSTOM_CLASSES)):
+                    yield from value.get_yield(_current_indent_level=_current_indent_level, default_iterencode=_iterencode)
                 elif isinstance(value, str):
                     yield buf + _encoder(value)
                 elif value is None:
@@ -303,10 +310,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             yield _encoder(key)
             yield _key_separator
             try:
-                if any([isinstance(value, t) for t in CUSTOM_CLASSES]) and \
-                        value.try_yield(default_iterencode=_iterencode):
-                    yield value.get_yield(default_iterencode=_iterencode)
-                if isinstance(value, str):
+                if isinstance(value, tuple(CUSTOM_CLASSES)):
+                    yield from value.get_yield("", current_indent_level=_current_indent_level, default_iterencode=_iterencode)
+                elif isinstance(value, str):
                     yield _encoder(value)
                 elif value is None:
                     yield 'null'
@@ -341,9 +347,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             del markers[markerid]
 
     def _iterencode(o, _current_indent_level, _local_separator=_item_separator):
-        if any([isinstance(o, t) for t in CUSTOM_CLASSES]) and \
-                o.try_yield(default_iterencode=_iterencode):
-            yield o.get_yield(default_iterencode=_iterencode)
+        if isinstance(o, tuple(CUSTOM_CLASSES)):
+            yield from o.get_yield("", current_indent_level=_current_indent_level, default_iterencode=_iterencode)
         elif isinstance(o, str):
             yield _encoder(o)
         elif o is None:
