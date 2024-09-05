@@ -20,14 +20,17 @@ class CustomSerializable:
     '{"data": 1@2@3}'
     '''
 
-    def encode(self, defualt_iterencode):
+    def __init__(self, data):
+        self.data = data
+
+    def encode(self, _current_indent_level, default_iterencode):
         '''Return a custom JSON string representation of a Python data structure.
 
         >>> from json.custom_json_encoder import CustomSerializable
         >>> class Foo(CustomSerializable):
                 def __init__(self, data):
                     self.data
-                def encode(self):
+                def encode(self, *args):
                     return '@'.join(self.data)
         >>> a = Foo([1,2,3])
         >>> a.encode()
@@ -35,13 +38,12 @@ class CustomSerializable:
         '''
         pass
 
-    def try_yield(self, default_iterencode):
+    def iterencode(self, current_indent_level, default_iterencode):
         try:
-            self.encode(default_iterencode)
+            yield self.encode(current_indent_level, default_iterencode)
         except CustomSerializeError:
-            return False
-        return True
+            yield from default_iterencode(self.data, current_indent_level)
     
-    def get_yield(self, buf, default_iterencode):
-        yield buf + self.encode(default_iterencode)
+    def get_yield(self, buf, current_indent_level, default_iterencode):
+        yield from (buf + i for i in self.iterencode(current_indent_level, default_iterencode))
 
