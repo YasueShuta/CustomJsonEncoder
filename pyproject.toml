@@ -1,4 +1,5 @@
 [project]
+name = "custom-json-encoder"
 dynamic = ["version"]
 requires-python = ">= 3.8"
 authors = [
@@ -8,9 +9,9 @@ maintainers = [
   {name = "Shuta Yasue", email = "shuta.59074.orionsbelt@gmail.com"}
 ]
 description = "Customable JSON Encoder for python."
-readme = README.md
+readme = "README.md"
 license = {file = "LICENSE"}
-keywords = {"custom", "json", "encoder", "YasueShuta"}
+keywords = ["custom", "json", "encoder", "YasueShuta"]
 classifiers = [
   # How mature is this project? Common values are
   #   3 - Alpha
@@ -34,3 +35,6 @@ classifiers = [
 [project.urls]
 Repository = "https://github.com/YasueShuta/CustomJsonEncoder.git"
 Issues = "https://github.com/YasueShuta/CustomJsonEncoder/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "custom_json_encoder.__version__"}
