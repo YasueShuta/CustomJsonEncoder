@@ -1,5 +1,5 @@
 from custom_json_encoder import CustomJSONEncoder, CustomSerializable
-from custom_json_encoder.sample import Oneline
+from custom_json_encoder.sample import Inline
 import json
 
 def test_custom_json_encoder():
@@ -17,17 +17,17 @@ def test_custom_json_encoder():
 def test_oneline_encoder():
     a = [1,2,3,4,5]
     b = {"a": "apple", "b": "banana", "c": "candy"}
-    print("With Oneline:")
+    print("With Inline:")
     print(json.dumps({"list": a, "dict": b}, indent=2))
 
-    print("\nWith Oneline")
-    print(json.dumps({"list": Oneline(a), "dict": Oneline(b)},
-                     indent=2, cls=CustomJSONEncoder, custom_classes=[Oneline]))
+    print("\nWith Inline")
+    print(json.dumps({"list": Inline(a), "dict": Inline(b)},
+                     indent=2, cls=CustomJSONEncoder, custom_classes=[Inline]))
     
     print("\n")
-    print(json.dumps({"list": Oneline(a, separator=' + '),
-                      "dict1": Oneline({"dict2": b}, key_separator=' = ')}, indent=2,
-                     cls=CustomJSONEncoder, custom_classes=[Oneline]))
+    print(json.dumps({"list": Inline(a, separator=' + '),
+                      "dict1": Inline({"dict2": b}, key_separator=' = ')}, indent=2,
+                     cls=CustomJSONEncoder, custom_classes=[Inline]))
 
     
 
