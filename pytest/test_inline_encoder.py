@@ -1,5 +1,5 @@
-from custom_json_encoder import CustomJSONEncoder, CustomSerializable
-from custom_json_encoder.sample import Inline
+from cjenc import CJEnc, CustomSerializable
+from cjenc.sample import Inline
 import json
 
 def test_custom_json_encoder():
@@ -12,27 +12,27 @@ def test_custom_json_encoder():
         
     a = Foo([1,2,3])
     # print(''.join(list(CustomJSONEncoder(custom_classes=[Foo]).iterencode(a))))
-    print(json.dumps({"data": a}, cls=CustomJSONEncoder, custom_classes=[Foo]))
+    print(json.dumps({"data": a}, cls=CJEnc, custom_classes=[Foo]))
 
-def test_oneline_encoder():
+def test_inline_encoder():
     a = [1,2,3,4,5]
     b = {"a": "apple", "b": "banana", "c": "candy"}
-    print("With Inline:")
+    print("Without Inline:")
     print(json.dumps({"list": a, "dict": b}, indent=2))
 
     print("\nWith Inline")
     print(json.dumps({"list": Inline(a), "dict": Inline(b)},
-                     indent=2, cls=CustomJSONEncoder, custom_classes=[Inline]))
+                     indent=2, cls=CJEnc, custom_classes=[Inline]))
     
     print("\n")
     print(json.dumps({"list": Inline(a, separator=' + '),
                       "dict1": Inline({"dict2": b}, key_separator=' = ')}, indent=2,
-                     cls=CustomJSONEncoder, custom_classes=[Inline]))
+                     cls=CJEnc, custom_classes=[Inline]))
 
     
 
 
 if __name__ == "__main__":
     # test_custom_json_encoder()
-    test_oneline_encoder()
+    test_inline_encoder()
 
