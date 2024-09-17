@@ -4,8 +4,8 @@ class Inline(CustomSerializable):
     '''Print items in oneline, even if indent is set.
 
     >>> import json
-    >>> from custom_json_encoder import CustomJSONEncoder
-    >>> from custom_json_encoder.sample import Inline
+    >>> from cjenc import CJEnc
+    >>> from cjenc.sample import Inline
     >>> a = [1,2,3]
     >>> b = {'a': 'apple', 'b': 'banana'}
     
@@ -24,10 +24,17 @@ class Inline(CustomSerializable):
     }
 
     With Oneline
-    >>> print(json.dumps({"list": Inline(a), "dict": Oneline(b)}, indent=2, cls=CustomJSONEncoder, custom_classes=[Inline]))
+    >>> print(json.dumps({"list": Inline(a), "dict": Inline(b)}, indent=2, cls=CJEnc, custom_classes=[Inline]))
     {
       "list": [1, 2, 3],
-      "dict": {: "apple", : "banana", : "candy"}
+      "dict": {"a": "apple", "b": "banana", "c": "candy"}
+    }
+
+    It is OK to omit custom_classes parameter, if you use classes in cjenc.sample.
+    >>> print(json.dumps({"list": Inline(a), "dict": Inline(b)}, indent=2, cls=CJEnc))
+    {
+      "list": [1, 2, 3],
+      "dict": {"a": "apple", "b": "banana", "c": "candy"}
     }
     '''
     def __init__(self, data, separator=', ', key_separator=': '):
@@ -62,3 +69,11 @@ class Inline(CustomSerializable):
         except:
             yield from default_iterencode(self.data,
                                           current_indent_level, self.separator)
+            
+
+__all__ = ["Inline"]
+
+
+from .customizable_json_encoder import CUSTOM_CLASSES
+for c in __all__:
+    CUSTOM_CLASSES.add(eval(c))
