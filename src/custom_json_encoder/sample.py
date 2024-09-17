@@ -1,15 +1,15 @@
 from .custom_serializable import CustomSerializable, CustomSerializeError
 
-class Oneline(CustomSerializable):
+class Inline(CustomSerializable):
     '''Print items in oneline, even if indent is set.
 
     >>> import json
     >>> from custom_json_encoder import CustomJSONEncoder
-    >>> from custom_json_encoder.sample import Oneline
+    >>> from custom_json_encoder.sample import Inline
     >>> a = [1,2,3]
     >>> b = {'a': 'apple', 'b': 'banana'}
     
-    Without Oneline
+    Without Inline
     >>> print(json.dumps({"list": a, "dict": b}, indent=2))
     {
       "list": [
@@ -24,7 +24,7 @@ class Oneline(CustomSerializable):
     }
 
     With Oneline
-    >>> print(json.dumps({"list": Oneline(a), "dict": Oneline(b)}, indent=2, cls=CustomJSONEncoder, custom_classes=[Oneline]))
+    >>> print(json.dumps({"list": Inline(a), "dict": Oneline(b)}, indent=2, cls=CustomJSONEncoder, custom_classes=[Inline]))
     {
       "list": [1, 2, 3],
       "dict": {: "apple", : "banana", : "candy"}
@@ -42,7 +42,7 @@ class Oneline(CustomSerializable):
                 for i,v in enumerate(self.data):
                     if i > 0:
                         yield self.separator
-                    yield from default_iterencode(Oneline(v, self.separator, self.key_separator),
+                    yield from default_iterencode(Inline(v, self.separator, self.key_separator),
                                                   current_indent_level, self.separator)
                 yield ']'
             elif isinstance(self.data, dict):
@@ -52,7 +52,7 @@ class Oneline(CustomSerializable):
                         yield self.separator
                     yield from default_iterencode(k, current_indent_level, self.separator)
                     yield self.key_separator
-                    yield from default_iterencode(Oneline(v, self.separator, self.key_separator),
+                    yield from default_iterencode(Inline(v, self.separator, self.key_separator),
                                                   current_indent_level, self.separator)
                 yield '}'
             else:
