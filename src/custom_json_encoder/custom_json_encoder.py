@@ -11,7 +11,7 @@ from json.encoder import (
     encode_basestring_ascii,
     JSONEncoder
 )
-CUSTOM_CLASSES = []
+CUSTOM_CLASSES = set()
 
 class CustomJSONEncoder(JSONEncoder):
     """Extensible JSON <https://json.org> encoder for Python data structures.
@@ -100,7 +100,7 @@ class CustomJSONEncoder(JSONEncoder):
         self.custom_classes = classes
         for t in classes:
             if issubclass(t, CustomSerializable):
-                CUSTOM_CLASSES.append(t)
+                CUSTOM_CLASSES.add(t)
             else:
                 print(f'{t.__name__} is not CustomSerializable.', file=stderr)
 
