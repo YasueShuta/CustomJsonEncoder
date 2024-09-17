@@ -4,7 +4,7 @@ class CustomSerializeError(Exception):
 class CustomSerializable:
     '''Custom JSON string representation of a Python data structure.
 
-    >>> from json.custom_json_encoder import CustomSerializable
+    >>> from cjenc import CustomSerializable
     >>> class Foo(CustomSerializable):
             def __init__(self, data):
                 self.data
@@ -15,8 +15,8 @@ class CustomSerializable:
     '1@2@3'
 
     >>> import json
-    >>> from json.custom_json_encoder import CustomJsonEncoder
-    >>> json.dumps({"data": a}, cls=CustomJsonEncoder, custom_classes=[Foo])
+    >>> from cjenc import CJEnc
+    >>> json.dumps({"data": a}, cls=CJEnc, custom_classes=[Foo])
     '{"data": 1@2@3}'
     '''
 
@@ -26,7 +26,7 @@ class CustomSerializable:
     def encode(self, _current_indent_level, default_iterencode):
         '''Return a custom JSON string representation of a Python data structure.
 
-        >>> from json.custom_json_encoder import CustomSerializable
+        >>> from cjenc import CustomSerializable
         >>> class Foo(CustomSerializable):
                 def __init__(self, data):
                     self.data
